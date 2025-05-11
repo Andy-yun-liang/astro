@@ -1,0 +1,83 @@
+---
+// Import necessary components for rendering
+import BaseLayout from "../../layouts/BaseLayout.astro"; // Layout for the page
+import BlogPost from "../../components/BlogPost.astro"; // Component to display each post
+
+// Function to generate static pages dynamically
+export async function getStaticPaths() {
+  // 1. Retrieve all the posts (markdown files) in the "posts" folder
+  // `import.meta.glob` is like a way to dynamically fetch all the `.md` files.
+  // It uses `{ eager: true }` to immediately import the posts as JavaScript objects, not just paths.
+  const allPosts = Object.values(
+    import.meta.glob("../posts/*.md", { eager: true })
+  );
+
+  // Example `allPosts` array (simplified for this example):
+  // [
+  //   { frontmatter: { tags: ["astro", "blogging"] }, url: "post1.md", frontmatter: { title: "Post 1" }},
+  //   { frontmatter: { tags: ["community"] }, url: "post2.md", frontmatter: { title: "Post 2" }},
+  //   { frontmatter: { tags: ["astro"] }, url: "post3.md", frontmatter: { title: "Post 3" }},
+  //   { frontmatter: { tags: ["blogging"] }, url: "post4.md", frontmatter: { title: "Post 4" }}
+  // ]
+
+  // 2. Get all tags from all the posts and ensure there are no duplicates
+  // `.map()` extracts the `tags` array from each post. The result will be an array of arrays.
+  // `.flat()` flattens it into a single array containing all tags from all posts.
+  // Example result after `.map()` and `.flat()`:
+  // ["astro", "blogging", "community", "astro", "blogging"]
+  
+  // `new Set()` is used to eliminate duplicates, leaving us with:
+  // ["astro", "blogging", "community"]
+
+  const uniqueTags = [
+    ...new Set(allPosts.map((post: any) => post.frontmatter.tags).flat()),
+  ];
+
+  // Example `uniqueTags` array:
+  // ["astro", "blogging", "community"]
+
+  // 3. Generate a dynamic page for each unique tag
+  // `.map()` iterates over each tag, and for each tag, we:
+  // - Filter the posts to only include those that have that tag
+  // - Return an object with `params` (the tag to be used in the URL) and `props` (the filtered posts for that tag)
+
+  return uniqueTags.map((tag) => {
+    // For each tag, filter the posts that have that tag
+    const filteredPosts = allPosts.filter((post: any) =>
+      post.frontmatter.tags.includes(tag) // Only include posts that have this tag
+    );
+
+    // Example: If the current tag is "astro", `filteredPosts` will look like this:
+    // [
+    //   { frontmatter: { tags: ["astro", "blogging"] }, url: "post1.md", frontmatter: { title: "Post 1" }},
+    //   { frontmatter: { tags: ["astro"] }, url: "post3.md", frontmatter: { title: "Post 3" }}
+    // ]
+
+    // Return an object for each tag containing:
+    // - `params`: the dynamic route parameter `tag` (like /tags/astro)
+    // - `props`: the filtered posts related to that tag
+    return {
+      params: { tag }, // { tag: "astro" }
+      props: { posts: filteredPosts }, // The list of posts for this tag
+    };
+  });
+}
+
+// Destructure `tag` and `posts` from `Astro.params` and `Astro.props`
+// `Astro.params` gives the dynamic route's parameters, e.g., tag from /tags/astro
+// `Astro.props` contains the filtered posts we passed earlier
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+
+---
+
+<BaseLayout pageTitle={tag}> {/* Layout for the page with a title based on the tag */}
+  <p>Posts tagged with {tag}</p> {/* Displays which tag we're looking at */}
+  
+  <ul>
+    {/* Loop through each post related to this tag and display them */}
+    {posts.map((post: any) => (
+      <BlogPost url={post.url} title={post.frontmatter.title} /> // Render each post using the BlogPost component
+    ))}
+  </ul>
+</BaseLayout>
